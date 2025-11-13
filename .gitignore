@@ -1,0 +1,13 @@
+# 操作系统和编辑器文件
+.vscode/
+
+# Python 依赖
+__pycache__/
+*.pyc
+venv/
+
+# 专门忽略所有大型数据集文件
+# 避免将数据集上传到 Git
+datasets/a123/*.pkl
+# 如果datasets/a123文件夹下所有内容都是大型数据，可以直接忽略整个文件夹：
+# datasets/a123/
