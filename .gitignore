@@ -1,13 +1,29 @@
-# 操作系统和编辑器文件
-.vscode/
-
-# Python 依赖
-__pycache__/
-*.pyc
-venv/
-
-# 专门忽略所有大型数据集文件
-# 避免将数据集上传到 Git
-datasets/a123/*.pkl
-# 如果datasets/a123文件夹下所有内容都是大型数据，可以直接忽略整个文件夹：
-# datasets/a123/
+__pycache__
+.vscode
+.venv
+datasets
+runs
+save
+__init__.py
+adaptive_heun.py
+adjoint.py
+bosh3.py
+cdesolve.py
+dopri5.py
+dopri8.py
+event_handling.py
+fehlberg2.py
+fixed_adams.py
+fixed_grid.py
+interp.py
+interpolation_base.py
+interpolation_cubic.py
+interpolation_hermite_cubic_bdiff.py
+interpolation_linear.py
+log_ode.py
+misc.py
+rk_common.py
+scipy_wrapper.py
+serializers.py
+solvers.py
+tsit5.py
