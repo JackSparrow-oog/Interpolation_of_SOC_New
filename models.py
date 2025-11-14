@@ -208,7 +208,7 @@ class Copy_SOCNet(nn.Module):
         #*args会将所有未被明确接收的额外位置参数打包成一个元组（tuple）
         #**kwargs会将所有未被明确接收的额外关键字参数打包成一个字典（dict）
         super().__init__()
-        self.func = SOCODEFunc()
+        self.func = Copy_SOCODEFunc()
         self.SOC_init_net = nn.Sequential(
             nn.Linear(4, 1), nn.Softplus(), nn.Linear(1, 1)
         )
