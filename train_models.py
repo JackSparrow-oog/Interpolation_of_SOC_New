@@ -337,11 +337,11 @@ def main(
 
 
 if __name__ == "__main__":
-    for model_sel in [W_SOCNet]:
+    for model_sel in [Copy_SOCNet]:
         for data_sel in ["ordered"]:
             main(
                 model_sel,
                 dataset=data_sel,
-                # save=f"{model_sel.__name__}",  # 反注释这行后可以保存训练后的模型
-                max_epochs=10,  # 按需要调大训练的 epoch 数目，实现训练效果
+                save=f"{model_sel.__name__}",  # 反注释这行后可以保存训练后的模型
+                max_epochs=5000,  # 按需要调大训练的 epoch 数目，实现训练效果
             )

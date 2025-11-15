@@ -4,6 +4,7 @@ __pycache__
 datasets
 runs
 save
+final
 __init__.py
 adaptive_heun.py
 adjoint.py
