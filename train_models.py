@@ -65,7 +65,7 @@ def load_data(
 
     Args:
         filename (str | None): 数据文件的路径，如果为 None，则根据 model_type 和 dataset 自动选择。
-        dataset (str): 数据集名称，默认为 "a123"。
+        dataset (str): 数据集名称
         model_type (type | None): 模型类型，用于选择对应的数据集文件。
         device (torch.device): 设备类型（CPU 或 GPU），用于张量分配。
 
@@ -80,7 +80,7 @@ def load_data(
             filename = f"datasets/{dataset}/random_SOC_50.pkl"
         # 修改
         elif model_type in [Copy_SOCNet]:
-            filename = f"datasets/{dataset}/resample_SOC_50.pkl"
+            filename = f"datasets/{dataset}/dropped_SOC_50_0.3.pkl"
         else:
             raise NotImplementedError
 
@@ -244,9 +244,6 @@ def main(
 ):
     # 构建数据集和数据加载器
     X, SC, Y = load_data(dataset=dataset, model_type=model_type, device=device)
-
-    X, SC, Y = drop_random_in_range_points(X, SC, Y, drop_ratio=0.15)
-
     # 训练集和测试集的划分
     # 【重要】训练集和测试集分开加载
     choice = np.random.permutation(X.shape[0]).tolist()#.permutation（样本数）用来生成0到样本数-1的随机排列索引，再变成列表
@@ -338,10 +335,10 @@ def main(
 
 if __name__ == "__main__":
     for model_sel in [Copy_SOCNet]:
-        for data_sel in ["ordered"]:
+        for data_sel in ["dropped"]:
             main(
                 model_sel,
                 dataset=data_sel,
-                save=f"{model_sel.__name__}",  # 反注释这行后可以保存训练后的模型
+                # save=f"{model_sel.__name__}",  # 反注释这行后可以保存训练后的模型
                 max_epochs=5000,  # 按需要调大训练的 epoch 数目，实现训练效果
             )
