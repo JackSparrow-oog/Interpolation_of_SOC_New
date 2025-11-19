@@ -24,9 +24,7 @@ from models import (
     Copy_SOCNet,
 )
 
-DROP_RATE = 0.2
-
-
+DROP_RATE = 0.3
 
 
 torch.autograd.set_detect_anomaly(True)  # 检测梯度异常
