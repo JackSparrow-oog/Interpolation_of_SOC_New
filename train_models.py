@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from torch.optim import Adam
 from torch.utils.tensorboard import SummaryWriter
 from typing import List, Tuple
-
+import time
 from utils import (
         mean_absolute_error,
         mean_absolute_percentage_error,
@@ -24,7 +24,7 @@ from models import (
     Copy_SOCNet,
 )
 
-DROP_RATE = 0.3
+DROP_RATE = 0.4
 
 
 torch.autograd.set_detect_anomaly(True)  # 检测梯度异常
@@ -277,10 +277,14 @@ def main(
 
     # 记录器
     if save is not None:
-        writer = SummaryWriter(log_dir=f"runs/{dataset + save + DROP_RATE}")#用于记录训练指标到TensorBoard中
+        writer = SummaryWriter(log_dir=f"runs/{dataset + save + str(DROP_RATE)}")#用于记录训练指标到TensorBoard中
     else:
         writer = Mock()
     saver = SaveAndEarlyStop(dataset=dataset, save=save)
+
+    # 记录训练开始时间
+    print(f"Starting training for {model_type.__name__} on {dataset}...")
+    start_time = time.time()
 
     for epoch in range(max_epochs):
         # 训练模型
@@ -333,6 +337,17 @@ def main(
         writer.add_scalar("RMSE", rmse, epoch + 1)
         if saver.stop(test_loss, model, optimizer):
             break
+    # 记录结束时间并计算时长
+    end_time = time.time()              # 记录结束时间戳
+    total_seconds = end_time - start_time # 计算总秒数
+    
+    # 格式化时间 (小时:分钟:秒)
+    m, s = divmod(total_seconds, 60)
+    h, m = divmod(m, 60)
+    
+    print("-" * 60)
+    print(f"Training Finished. Total Duration: {int(h)}h {int(m)}m {int(s)}s") # 打印最终时长
+    print("-" * 60)
 
 
 
