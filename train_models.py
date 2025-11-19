@@ -24,6 +24,11 @@ from models import (
     Copy_SOCNet,
 )
 
+DROP_RATE = 0.2
+
+
+
+
 torch.autograd.set_detect_anomaly(True)  # 检测梯度异常
 
 # 随机数种子
@@ -80,7 +85,7 @@ def load_data(
             filename = f"datasets/{dataset}/random_SOC_50.pkl"
         # 修改
         elif model_type in [Copy_SOCNet]:
-            filename = f"datasets/{dataset}/dropped_SOC_50_0.3.pkl"
+            filename = f"datasets/{dataset}/dropped_SOC_50_{DROP_RATE}.pkl"
         else:
             raise NotImplementedError
 
@@ -274,7 +279,7 @@ def main(
 
     # 记录器
     if save is not None:
-        writer = SummaryWriter(log_dir=f"runs/{dataset + save}")#用于记录训练指标到TensorBoard中
+        writer = SummaryWriter(log_dir=f"runs/{dataset + save + DROP_RATE}")#用于记录训练指标到TensorBoard中
     else:
         writer = Mock()
     saver = SaveAndEarlyStop(dataset=dataset, save=save)
@@ -339,6 +344,7 @@ if __name__ == "__main__":
             main(
                 model_sel,
                 dataset=data_sel,
-                # save=f"{model_sel.__name__}",  # 反注释这行后可以保存训练后的模型
+                save=f"{model_sel.__name__}",  # 反注释这行后可以保存训练后的模型
                 max_epochs=5000,  # 按需要调大训练的 epoch 数目，实现训练效果
+                
             )

@@ -14,22 +14,24 @@ SERIALIZERS = {
 
 
 class _Repara(Module):
-    def __init__(self, T: Tensor) -> None:
+    def __init__(self, T: Tensor, t_mask: Tensor | None = None) -> None:
         super().__init__()
         self.T = T
+        t_mask = t_mask
+        self.DELTA = torch.diff(
+            self.T, dim=1
+        )  # [batch_dims, seq_len - 1, *t_X_channels]
+        assert self.DELTA.isfinite().all()
+        if t_mask is not None:
+            assert (self.DELTA[:, :, t_mask] != 0).all()  # t_mask is not None
 
     def forward(self, s: Tensor, j: int) -> tuple[Tensor | None]:
         raise NotImplementedError
 
 
 class HermiteRepara(_Repara):
-    def __init__(self, T: Tensor, method: str | None = None) -> None:
-        super().__init__(T)
-
-        self.DELTA = torch.diff(
-            self.T, dim=1
-        )  # [batch_dims, seq_len - 1, *t_X_channels]
-        assert self.DELTA.isfinite().all()
+    def __init__(self, T: Tensor, t_mask: Tensor | None = None, method: str | None = None) -> None:
+        super().__init__(T, t_mask)
 
         self.D = torch.zeros_like(self.T)  # [batch_dims, seq_len, *t_X_channels]
         if method is None:
@@ -113,12 +115,8 @@ class HermiteRepara(_Repara):
 
 
 class PCHIPRepara(_Repara):
-    def __init__(self, T: Tensor) -> None:
-        super().__init__(T)
-        self.DELTA = torch.diff(
-            self.T, dim=1
-        )  # [batch_dims, seq_len - 1, *t_X_channels]
-        assert self.DELTA.isfinite().all()
+    def __init__(self, T: Tensor, t_mask: Tensor | None = None) -> None:
+        super().__init__(T, t_mask)
 
         a = self.T  # [batch_dims, seq_len, *t_X_channels]
         b = torch.empty_like(self.T)  # [batch_dims, seq_len, *t_X_channels]
@@ -162,14 +160,8 @@ class PCHIPRepara(_Repara):
 
 
 class MonoRationalRepara(_Repara):
-    def __init__(self, T: Tensor) -> None:
-        super().__init__(T)
-
-        self.DELTA = torch.diff(
-            self.T, dim=1
-        )  # [batch_dims, seq_len - 1, *t_X_channels]
-        assert self.DELTA.isfinite().all()
-        assert not (self.DELTA == 0).any()  # 假定差分不为0
+    def __init__(self, T: Tensor, t_mask: Tensor | None = None) -> None:
+        super().__init__(T, t_mask)
 
         B = self.T.shape[0]  # batch_dims
         N = self.T.shape[1]  # seq_len
@@ -249,10 +241,10 @@ class _ReparaFunc(Module):
             dtype=self.T.dtype,
         )  # 0, 1, ..., N-1
 
-        self.repara = repara_method(self.T)
+        if t_mask is not None:
+            assert t_mask.shape == self.T.shape[2:]
         self.t_mask = t_mask
-        if self.t_mask is not None:
-            assert self.t_mask.shape == self.T.shape[2:]
+        self.repara = repara_method(self.T, t_mask=t_mask)
         self.t_view = t_view
 
         # 添加输入
@@ -285,7 +277,6 @@ class _ReparaFunc(Module):
         phi, dphi_ds = self.repara(s, j)
         phi: torch.Tensor  # [batch_dims, *t_X_channels]
         dphi_ds: torch.Tensor  # [batch_dims, *t_X_channels]
-
         # 获得实时输入
         if self.serializers is not None:
             inputs: list[list[Tensor, Tensor]] = [[phi, dphi_ds]]
@@ -319,9 +310,9 @@ class _ReparaFunc(Module):
 def time_input_repara(ode_solver):
     @wraps(ode_solver)
     def reparameterization(*args, **kwargs):
-        t_mask = kwargs.pop("t_mask") if "t_mask" in kwargs else None
-        t_view = kwargs.pop("t_view") if "t_view" in kwargs else None
-        inputs = kwargs.pop("inputs") if "inputs" in kwargs else None
+        t_mask = kwargs.pop("t_mask", None)
+        t_view = kwargs.pop("t_view", None)
+        inputs = kwargs.pop("inputs", None)
 
         args_dict = signature(ode_solver).bind(*args, **kwargs)
         args_dict.apply_defaults()

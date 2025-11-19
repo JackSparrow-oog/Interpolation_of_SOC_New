@@ -1,6 +1,6 @@
 import torch
 from torch import nn, Tensor
-# from torchode import odeint
+from torchode import odeint
 
 
 def OCV_SOC_curve_mich(SOC: torch.Tensor, OCV_SOC_params: torch.Tensor) -> torch.Tensor:
@@ -57,27 +57,27 @@ params = {
 }
 
 
-#原本prednet的odeint
-def odeint(
-    func: nn.Module, y0: Tensor, X: Tensor, t_mask: Tensor | None = None, **kwargs
-) -> Tensor:
-    # y0.shape: [batch_dims, *y_channels]
-    # X.shape: [batch_dims, seq_len, *t_X_channels]
-    # t_mask.shape: [*t_X_channels]
-    if t_mask is not None:
-        ts = X[:, :, t_mask]  # [batch_dims, seq_len, *t_channels]
-    else:
-        ts = X  # [batch_dims, seq_len, *t_channels]
-    y = y0  # [batch_dims, *y_channels]
-    ys = [y]
-    for i in range(ts.shape[1] - 1):
-        y: torch.Tensor = y + (ts[:, i + 1, ...] - ts[:, i, ...]) * func.forward(
-            [X[:, i, ...]], y
-        )  # [batch_dims, *y_channels]
-        # assert y.isfinite().all()
-        ys.append(y)
+# #原本prednet的odeint
+# def odeint(
+#     func: nn.Module, y0: Tensor, X: Tensor, t_mask: Tensor | None = None, **kwargs
+# ) -> Tensor:
+#     # y0.shape: [batch_dims, *y_channels]
+#     # X.shape: [batch_dims, seq_len, *t_X_channels]
+#     # t_mask.shape: [*t_X_channels]
+#     if t_mask is not None:
+#         ts = X[:, :, t_mask]  # [batch_dims, seq_len, *t_channels]
+#     else:
+#         ts = X  # [batch_dims, seq_len, *t_channels]
+#     y = y0  # [batch_dims, *y_channels]
+#     ys = [y]
+#     for i in range(ts.shape[1] - 1):
+#         y: torch.Tensor = y + (ts[:, i + 1, ...] - ts[:, i, ...]) * func.forward(
+#             [X[:, i, ...]], y
+#         )  # [batch_dims, *y_channels]
+#         # assert y.isfinite().all()
+#         ys.append(y)
 
-    return torch.stack(ys, dim=0)  # [seq_len, batch_dims, *y_channels]
+#     return torch.stack(ys, dim=0)  # [seq_len, batch_dims, *y_channels]
 
 
 
