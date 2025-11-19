@@ -1,5 +1,6 @@
 import math
 import random
+import time
 from unittest.mock import Mock
 from pathlib import Path
 from datetime import date
@@ -24,7 +25,7 @@ from models import (
     Copy_SOCNet,
 )
 
-DROP_RATE = 0.2
+DROP_RATE = 0.4
 
 
 
@@ -279,10 +280,13 @@ def main(
 
     # 记录器
     if save is not None:
-        writer = SummaryWriter(log_dir=f"runs/{dataset + save + DROP_RATE}")#用于记录训练指标到TensorBoard中
+        writer = SummaryWriter(log_dir=f"runs/{dataset + save + str(DROP_RATE)}")#用于记录训练指标到TensorBoard中
     else:
         writer = Mock()
     saver = SaveAndEarlyStop(dataset=dataset, save=save)
+
+    print(f"Starting training for {model_type.__name__} on {dataset}...")
+    start_time = time.time()  # <--- 新增：记录开始时间戳
 
     for epoch in range(max_epochs):
         # 训练模型
@@ -335,6 +339,16 @@ def main(
         writer.add_scalar("RMSE", rmse, epoch + 1)
         if saver.stop(test_loss, model, optimizer):
             break
+    end_time = time.time()              # <--- 新增：记录结束时间戳
+    total_seconds = end_time - start_time # <--- 新增：计算总秒数
+    
+    # 格式化时间 (小时:分钟:秒)
+    m, s = divmod(total_seconds, 60)
+    h, m = divmod(m, 60)
+    
+    print("-" * 60)
+    print(f"Training Finished. Total Duration: {int(h)}h {int(m)}m {int(s)}s") # <--- 新增：打印最终时长
+    print("-" * 60)
 
 
 
