@@ -1120,9 +1120,13 @@ class ODEFunc(nn.Module):
             nn.Linear(hidden_channels, hidden_channels),
         )
         init_network_weights(self.net)
+        # 新增：用于存储当前 batch 的时间步长
+        self.delta_t = None
 
     def forward(self, t, h):
-        return self.net(h)
+        # t 在这里是标准化的虚拟时间 (0 到 1)，对网络本身无影响
+        # 我们计算 dy/dt * dt/d_tau
+        return self.net(h) * self.delta_t
 
 
 class ODERNNCell(nn.Module):
@@ -1131,10 +1135,38 @@ class ODERNNCell(nn.Module):
         self.ode_func = ODEFunc(hidden_channels)
         self.rnn_cell = nn.GRUCell(input_channels, hidden_channels)
 
-    def forward(self, h, x, delta_t):
-        h = odeint(self.ode_func, h, delta_t)[-1]
-        h = self.rnn_cell(x, h)
-        return h
+    def forward(self, h, x, t_span_batch):
+        """
+        t_span_batch shape: [batch_size, 2, 1] (start_time, end_time)
+        """
+        # 1. 计算每个样本的时间差 delta_t: [batch_size, 1]
+        # t_end - t_start
+        delta_t = t_span_batch[:, 1] - t_span_batch[:, 0]
+        
+        # 2. 将时间差注入 ODEFunc，用于缩放导数
+        self.ode_func.delta_t = delta_t
+
+        # 3. 创建标准化的时间跨度 [0, 1]
+        # 必须是 1D Tensor，且与 h 在同一个 device
+        t_eval = torch.tensor([0.0, 1.0], device=h.device, dtype=h.dtype)
+
+        # 4. 调用 odeint
+        # 此时求解的是 dy/d_tau，从 tau=0 积分为 tau=1
+        # 对应的就是 dy/dt 从 t_start 积分为 t_end
+        ode_solution = odeint(
+            func=self.ode_func, 
+            y0=h, 
+            t=t_eval, 
+            method='rk4' # 或其他支持的方法
+        )
+        
+        # odeint 返回 shape 通常为 [len(t), batch, hidden]
+        # 我们取最后一个时间点 (tau=1) 的结果
+        h_prev = ode_solution[-1]
+
+        # 5. RNN 更新
+        h_next = self.rnn_cell(x, h_prev)
+        return h_next
 
 
 class ODERNNForSOC(nn.Module):
@@ -1149,23 +1181,37 @@ class ODERNNForSOC(nn.Module):
         self.ode_rnn_cell = ODERNNCell(x_channels + sc_channels, h_channels)
         self.output_layer = nn.Linear(h_channels, y_channels)
 
-    def forward(self, X: Tensor, SC: Tensor):
+    def forward(self, X: torch.Tensor, SC: torch.Tensor):
         batch_dims, seq_len, _ = X.shape
-        t = X[..., 0:1]  # [batch_dims, seq_len, 1]
+        # 获取时间通道 [batch_dims, seq_len, 1]
+        t = X[..., 0:1] 
         h = torch.zeros(batch_dims, self.h_channels).to(X.device)
-
-        # Repeat SC for each time step and concatenate with X
+        # SC 扩展并拼接
         SC_repeated = SC.unsqueeze(-2).repeat(1, seq_len, 1)
         X_concat = torch.cat([X, SC_repeated], dim=-1)
         hs = []
+        # 注意：原代码的循环逻辑似乎有点特殊（从 -1 开始）
+        # 这里保留原逻辑，假设意图是处理 t[0] 到 t[1] 之间的演化
         for i in range(-1, seq_len - 1):
             if i < 0:
-                delta_t = torch.stack([t[..., 0, :], t[..., 1, :]], dim=-2)
+                # 初始区间: t[0] -> t[0] (如果 delta=0) 或者 t[0]->t[1]?
+                # 原代码逻辑：t[..., 0, :], t[..., 1, :]
+                # 这意味着第一个RNN step利用的是 t0->t1 的ODE演化
+                time_pair = torch.stack([t[:, 0, :], t[:, 1, :]], dim=1) # [Batch, 2, 1]
+                # 注意：i=-1 时，输入数据 X 使用哪个索引？
+                # 原代码用 X_concat[:, i, :]，Python中 -1 是最后一个元素。
+                # 这里可能是逻辑 bug，通常 ODE-RNN 应该是 i=0 到 seq_len-1
+                # 如果你的意图是 i=-1 对应 X[0]，请将下方索引改为 0 或者 i+1
+                # 下面我假设你想用第 0 个输入：
+                current_x = X_concat[:, 0, :] 
             else:
-                delta_t = torch.stack([t[..., i, :], t[..., i + 1, :]], dim=-2)
-            h = self.ode_rnn_cell(h, X_concat[:, i, :], delta_t)
+                time_pair = torch.stack([t[:, i, :], t[:, i + 1, :]], dim=1)
+                current_x = X_concat[:, i + 1, :] # 对应 t[i+1] 时刻的观测
+
+            h = self.ode_rnn_cell(h, current_x, time_pair)
             hs.append(h)
-        hs = torch.stack(hs, dim=-2)
+            
+        hs = torch.stack(hs, dim=1) # [batch, seq_len, hidden]
         y = self.output_layer(hs)
         return y
 
